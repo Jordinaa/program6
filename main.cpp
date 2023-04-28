@@ -1,5 +1,3 @@
-// Authors: Jordan Taranto, Garry Bhullar, Deyanira Chavez
-
 #include "queue.h"
 #include "linkedlist.h"
 
@@ -20,7 +18,7 @@ int generateItems() {
 int main() {
     srand(time(0)); // Seed the random number generator
 
-    cout << "Enter the number of checkout lines (1-10): ";
+    cout << "Enter the number of checkout lines: ";
     int numLines;
     cin >> numLines;
 
@@ -30,25 +28,22 @@ int main() {
     LinkedList carts;
     int currentTime = 0;
     int cartId = 0;
-    while (true) {
+    while (currentTime <= 720) {
         int customersArriving = rand() % 3 + 1;
-        bool customersAdded = false;
 
-        for (int i = 0; i < customersArriving && currentTime <= 720; ++i) {
+        for (int i = 0; i < customersArriving; ++i) {
             int items = generateItems();
             int shoppingTime = items * (rand() % 31 + 30);
             int enterQTime = currentTime + shoppingTime;
 
             listType cart = { cartId++, items, enterQTime, -1 };
             carts.addElement(cart);
-            customersAdded = true;
         }
 
-        bool queuesUpdated = false;
         for (int i = 0; i < numLines; ++i) {
             while (!carts.listIsEmpty() && currentTime >= carts.peek().enterQTime) {
                 int minQueueIndex = 0;
-                int minQueueLength = queueStats[minQueueIndex].queueCount;
+                int minQueueLength = queueStats[0].queueCount;
 
                 for (int j = 1; j < numLines; ++j) {
                     if (queueStats[j].queueCount < minQueueLength) {
@@ -69,7 +64,6 @@ int main() {
                 if (queueStats[minQueueIndex].queueCount > queueStats[minQueueIndex].maxQueueLength) {
                     queueStats[minQueueIndex].maxQueueLength = queueStats[minQueueIndex].queueCount;
                 }
-                queuesUpdated = true;
             }
 
             while (!checkouts[i].queueEmpty() && currentTime >= checkouts[i].peek().timeAvailable) {
@@ -77,7 +71,6 @@ int main() {
                 queueStats[i].currItems -= finishedCart.itemCount;
                 queueStats[i].queueCount--;
                 queueStats[i].totalItems += finishedCart.itemCount;
-                queuesUpdated = true;
             }
 
             if (checkouts[i].queueEmpty()) {
@@ -87,10 +80,6 @@ int main() {
             if (currentTime > 720 && !checkouts[i].queueEmpty()) {
                 queueStats[i].totalOverTime++;
             }
-        }
-
-        if (!customersAdded && !queuesUpdated) {
-            break;
         }
 
         currentTime++;
