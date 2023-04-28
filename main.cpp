@@ -1,65 +1,108 @@
-#include <iostream>
+// Authors: Jordan Taranto, Garry Bhullar, Deyanira Chavez
+
 #include "queue.h"
 #include "linkedlist.h"
-#include <random>
-using namespace std;
 
-int main(){
+int generateItems() {
+    int randomValue = rand() % 100 + 1;
 
-	int numQ = 0;
+    if (randomValue <= 40) {
+        return rand() % 11;
+    } else if (randomValue <= 70) {
+        return rand() % 10 + 11;
+    } else if (randomValue <= 90) {
+        return rand() % 10 + 21;
+    } else {
+        return rand() % 30 + 31;
+    }
+}
 
-	cout << "Enter the amount of checkout queue(s) you would like to test: ";
-	cin >> numQ;
+int main() {
+    srand(time(0)); // Seed the random number generator
 
-	int timeOpen = 720;
-  int currTime = 0;
-  
+    cout << "Enter the number of checkout lines (1-10): ";
+    int numLines;
+    cin >> numLines;
 
-	for (int i = 0; i < timeOpen; i++) {
-		currTime++;
-		int customersEnter = 0;
-    listType person;
+    vector<CheckoutQueue> checkouts(numLines);
+    vector<queueData> queueStats(numLines);
 
-		customersEnter = rand() % 3 + 1;
+    LinkedList carts;
+    int currentTime = 0;
+    int cartId = 0;
+    while (true) {
+        int customersArriving = rand() % 3 + 1;
+        bool customersAdded = false;
 
-		for (int i = 0; i < customersEnter; i++) {
-			LinkedList::listCount++;
-      srand(time(0));
-      person.cartId = (rand() % 100000);
-      const double p1 = 0.4;
-      const double p2 = 0.3;
-      const double p3 = 0.2;
-      const double p4 = 0.1;
+        for (int i = 0; i < customersArriving && currentTime <= 720; ++i) {
+            int items = generateItems();
+            int shoppingTime = items * (rand() % 31 + 30);
+            int enterQTime = currentTime + shoppingTime;
 
-      double items_probability = static_cast<double>(rand()) / RAND_MAX;
+            listType cart = { cartId++, items, enterQTime, -1 };
+            carts.addElement(cart);
+            customersAdded = true;
+        }
 
-      if (items_probability < p1){
-        person.itemCount = 1 + rand() % 10;
-      }
-      else if (items_probability < p1 + p2){
-        person.itemCount = 1 + 11 + rand() % 10;
-      }
-      else if (items_probability < p1+ p2 + p3){
-        person.itemCount = 21 + rand() % 10;
-      }
-      else{
-        person.itemCount = 31 + rand() % 30;
-      }
+        bool queuesUpdated = false;
+        for (int i = 0; i < numLines; ++i) {
+            while (!carts.listIsEmpty() && currentTime >= carts.peek().enterQTime) {
+                int minQueueIndex = 0;
+                int minQueueLength = queueStats[minQueueIndex].queueCount;
 
-      double shoppingTime;
-      
-      for (int i = 0; i < person.itemCount; i++){
-        double timeShop = static_cast<double>(rand()) / RAND_MAX;
-        double timeShopScale = 0.5 + timeShop * 0.5;
-        shoppingTime += timeShopScale;
-      }
+                for (int j = 1; j < numLines; ++j) {
+                    if (queueStats[j].queueCount < minQueueLength) {
+                        minQueueLength = queueStats[j].queueCount;
+                        minQueueIndex = j;
+                    }
+                }
 
-      int checkoutTime = person.itemCount * 0.25;
+                listType cart = carts.peek();
+                carts.delElement();
 
-      person.enterQTime = currTime + static_cast<int>(shoppingTime);
-      person.exitQTime = person.enterQTime + checkoutTime;
-		}
-	}
+                queueNodeData newNodeData = { currentTime + (cart.itemCount * 15), cart.itemCount };
+                checkouts[minQueueIndex].enQueue(newNodeData);
+                queueStats[minQueueIndex].cartList.push_back(cart.cartId);
+                queueStats[minQueueIndex].currItems += cart.itemCount;
+                queueStats[minQueueIndex].queueCount++;
 
-	return 0;
+                if (queueStats[minQueueIndex].queueCount > queueStats[minQueueIndex].maxQueueLength) {
+                    queueStats[minQueueIndex].maxQueueLength = queueStats[minQueueIndex].queueCount;
+                }
+                queuesUpdated = true;
+            }
+
+            while (!checkouts[i].queueEmpty() && currentTime >= checkouts[i].peek().timeAvailable) {
+                queueNodeData finishedCart = checkouts[i].deQueue();
+                queueStats[i].currItems -= finishedCart.itemCount;
+                queueStats[i].queueCount--;
+                queueStats[i].totalItems += finishedCart.itemCount;
+                queuesUpdated = true;
+            }
+
+            if (checkouts[i].queueEmpty()) {
+                queueStats[i].totalIdleTime++;
+            }
+
+            if (currentTime > 720 && !checkouts[i].queueEmpty()) {
+                queueStats[i].totalOverTime++;
+            }
+        }
+
+        if (!customersAdded && !queuesUpdated) {
+            break;
+        }
+
+        currentTime++;
+    }
+
+    for (int i = 0; i < numLines; ++i) {
+        cout << "CHECKOUT LINE: " << i + 1 << endl;
+        cout << "    Total Customers Helped: " << queueStats[i].cartList.size() << endl;
+        cout << "    Total Number of Items: " << queueStats[i].totalItems << endl;
+        cout << "    Max Line Length: " << queueStats[i].maxQueueLength << endl;
+        cout << "    Total Idle Time: " << queueStats[i].totalIdleTime << " minutes" << endl;
+        cout << "    Total Over Time: " << queueStats[i].totalOverTime << " minutes" << endl;
+    }
+  return 0;
 }
