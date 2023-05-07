@@ -1,97 +1,138 @@
+#include <iostream>
+#include <vector>
 #include "queue.h"
 #include "linkedlist.h"
 
-int generateItems() {
-    int randomValue = rand() % 100 + 1;
-
-    if (randomValue <= 40) {
-        return rand() % 11;
-    } else if (randomValue <= 70) {
-        return rand() % 10 + 11;
-    } else if (randomValue <= 90) {
-        return rand() % 10 + 21;
-    } else {
-        return rand() % 30 + 31;
-    }
-}
+using namespace std;
 
 int main() {
-    srand(time(0)); // Seed the random number generator
+    srand(time(0));
 
-    cout << "Enter the number of checkout lines: ";
-    int numLines;
-    cin >> numLines;
-
-    vector<CheckoutQueue> checkouts(numLines);
-    vector<queueData> queueStats(numLines);
-
-    LinkedList carts;
-    int currentTime = 0;
+    int numCheckouts;
     int cartId = 0;
-    while (currentTime <= 720) {
-        int customersArriving = rand() % 3 + 1;
 
-        for (int i = 0; i < customersArriving; ++i) {
-            int items = generateItems();
-            int shoppingTime = items * (rand() % 31 + 30);
+    cout << "Enter the number of checkout lines (1-10): ";
+    cin >> numCheckouts;
+
+    while (numCheckouts < 1 || numCheckouts > 10) {
+        cout << "Invalid input. Please enter a number between 1 and 10: ";
+        cin >> numCheckouts;
+    }
+
+    LinkedList store;
+    vector<CheckoutQueue> checkouts(numCheckouts);
+    vector<queueData> checkoutData(numCheckouts);
+
+    for (int currentTime = 0; currentTime <= 720; ++currentTime) {
+        // 1. Decide how many customers arrived at the store (1, 2 or 3?)
+        int numCustomers = rand() % 3 + 1;
+
+        // 2. Add the customers to the linked list representing the shoppers in the store
+        for (int i = 0; i < numCustomers; ++i) {
+            int itemCount;
+            int customerType = rand() % 100;
+
+            if (customerType < 40) {
+                itemCount = rand() % 11;
+            } else if (customerType < 70) {
+                itemCount = rand() % 10 + 11;
+            } else if (customerType < 90) {
+                itemCount = rand() % 10 + 21;
+            } else {
+                itemCount = rand() % 30 + 31;
+            }
+
+            int shoppingTime = itemCount * (rand() % 31 + 30);
             int enterQTime = currentTime + shoppingTime;
+            int exitQTime = enterQTime + itemCount * 15;
 
-            listType cart = { cartId++, items, enterQTime, -1 };
-            carts.addElement(cart);
+            listType newCustomer = {cartId++, itemCount, enterQTime, exitQTime};
+            store.addElement(newCustomer);
         }
 
-        for (int i = 0; i < numLines; ++i) {
-            while (!carts.listIsEmpty() && currentTime >= carts.peek().enterQTime) {
-                int minQueueIndex = 0;
-                int minQueueLength = queueStats[0].queueCount;
+        // 3. Update the checkout lines
+        for (int i = 0; i < numCheckouts; ++i) {
+            if (!store.listIsEmpty() && store.peek().enterQTime == currentTime) {
+                listType customer = store.peek();
+                store.delElement();
 
-                for (int j = 1; j < numLines; ++j) {
-                    if (queueStats[j].queueCount < minQueueLength) {
-                        minQueueLength = queueStats[j].queueCount;
-                        minQueueIndex = j;
+                int shortestQueue = 0;
+                for (int j = 1; j < numCheckouts; ++j) {
+                    if (checkoutData[j].currItems < checkoutData[shortestQueue].currItems) {
+                        shortestQueue = j;
                     }
                 }
 
-                listType cart = carts.peek();
-                carts.delElement();
+                queueNodeData newQueueNode = {customer.exitQTime, customer.itemCount};
+                checkouts[shortestQueue].enQueue(newQueueNode);
 
-                queueNodeData newNodeData = { currentTime + (cart.itemCount * 15), cart.itemCount };
-                checkouts[minQueueIndex].enQueue(newNodeData);
-                queueStats[minQueueIndex].cartList.push_back(cart.cartId);
-                queueStats[minQueueIndex].currItems += cart.itemCount;
-                queueStats[minQueueIndex].queueCount++;
+                checkoutData[shortestQueue].queueCount++;
+                checkoutData[shortestQueue].currItems += customer.itemCount;
+                checkoutData[shortestQueue].totalItems += customer.itemCount;
+                checkoutData[shortestQueue].cartList.push_back(customer.cartId);
 
-                if (queueStats[minQueueIndex].queueCount > queueStats[minQueueIndex].maxQueueLength) {
-                    queueStats[minQueueIndex].maxQueueLength = queueStats[minQueueIndex].queueCount;
+                if (checkoutData[shortestQueue].queueCount > checkoutData[shortestQueue].maxQueueLength) {
+                    checkoutData[shortestQueue].maxQueueLength = checkoutData[shortestQueue].queueCount;
                 }
             }
 
-            while (!checkouts[i].queueEmpty() && currentTime >= checkouts[i].peek().timeAvailable) {
-                queueNodeData finishedCart = checkouts[i].deQueue();
-                queueStats[i].currItems -= finishedCart.itemCount;
-                queueStats[i].queueCount--;
-                queueStats[i].totalItems += finishedCart.itemCount;
-            }
-
-            if (checkouts[i].queueEmpty()) {
-                queueStats[i].totalIdleTime++;
-            }
-
-            if (currentTime > 720 && !checkouts[i].queueEmpty()) {
-                queueStats[i].totalOverTime++;
+            if (!checkouts[i].queueEmpty() && checkouts[i].peek().timeAvailable == currentTime) {
+                                checkoutData[i].currItems -= checkouts[i].peek().itemCount;
+                checkouts[i].deQueue();
+                checkoutData[i].queueCount--;
+            } else if (checkouts[i].queueEmpty()) {
+                checkoutData[i].totalIdleTime++;
             }
         }
-
-        currentTime++;
     }
 
-    for (int i = 0; i < numLines; ++i) {
-        cout << "CHECKOUT LINE: " << i + 1 << endl;
-        cout << "    Total Customers Helped: " << queueStats[i].cartList.size() << endl;
-        cout << "    Total Number of Items: " << queueStats[i].totalItems << endl;
-        cout << "    Max Line Length: " << queueStats[i].maxQueueLength << endl;
-        cout << "    Total Idle Time: " << queueStats[i].totalIdleTime << " minutes" << endl;
-        cout << "    Total Over Time: " << queueStats[i].totalOverTime << " minutes" << endl;
+    // Continue processing customers after store closing
+    while (!store.listIsEmpty()) {
+        int currentTime = store.peek().enterQTime;
+
+        for (int i = 0; i < numCheckouts; ++i) {
+            if (!store.listIsEmpty() && store.peek().enterQTime == currentTime) {
+                listType customer = store.peek();
+                store.delElement();
+
+                int shortestQueue = 0;
+                for (int j = 1; j < numCheckouts; ++j) {
+                    if (checkoutData[j].currItems < checkoutData[shortestQueue].currItems) {
+                        shortestQueue = j;
+                    }
+                }
+
+                queueNodeData newQueueNode = {customer.exitQTime, customer.itemCount};
+                checkouts[shortestQueue].enQueue(newQueueNode);
+
+                checkoutData[shortestQueue].queueCount++;
+                checkoutData[shortestQueue].currItems += customer.itemCount;
+                checkoutData[shortestQueue].totalItems += customer.itemCount;
+                checkoutData[shortestQueue].cartList.push_back(customer.cartId);
+
+                if (checkoutData[shortestQueue].queueCount > checkoutData[shortestQueue].maxQueueLength) {
+                    checkoutData[shortestQueue].maxQueueLength = checkoutData[shortestQueue].queueCount;
+                }
+            }
+
+            if (!checkouts[i].queueEmpty() && checkouts[i].peek().timeAvailable == currentTime) {
+                checkouts[i].deQueue();
+                checkoutData[i].queueCount--;
+                checkoutData[i].currItems -= checkouts[i].peek().itemCount;
+                checkoutData[i].totalOverTime++;
+            }
+        }
     }
-  return 0;
+
+    // Print checkout statistics
+    for (int i = 0; i < numCheckouts; ++i) {
+        cout << "Checkout line: " << (i + 1) << endl;
+        cout << "    Total Customers Helped: " << checkoutData[i].cartList.size() << endl;
+        cout << "    Total Number of Items: " << checkoutData[i].totalItems << endl;
+        cout << "    Max Line Length: " << checkoutData[i].maxQueueLength << endl;
+        cout << "    Total Idle Time: " << checkoutData[i].totalIdleTime << endl;
+        cout << "    Total over time: " << checkoutData[i].totalOverTime << endl << endl;
+    }
+
+    return 0;
 }
